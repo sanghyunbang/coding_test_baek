@@ -2,15 +2,10 @@ class Solution {
     public int solution(String my_string) {
         int answer = 0;
         
-        char[] ch = {'1','2','3','4','5','6','7','8','9'};
+        String s = my_string.replaceAll("[^0-9]","");
         
-        for (int i = 0; i < my_string.length(); i++){
-            for (char c : ch){
-                if (c == my_string.charAt(i)){
-                    answer += c - '0';
-                    break;
-                }
-            }
+        for (int i = 0; i < s.length(); i++){
+            answer += s.charAt(i) - '0';
         }
         
         return answer;
