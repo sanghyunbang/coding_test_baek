@@ -1,61 +1,78 @@
 import java.util.*;
 
 class Solution {
-    int n; // 칼럼 수
-    int m; // 행수
+    int M;
+    int N;
+    
+    // 유일성 충족하는 리스트 뽑아내기
+    List<Integer> unique = new ArrayList<>();
+    String[][] relation;
+    
     public int solution(String[][] relation) {
         
+        N = relation.length; // 튜플 수
+        M = relation[0].length; // 칼럼 수
+        this.relation = relation;
         
-        // 
-        n = relation[0].length;
-        m = relation.length;
-        
-        Set<Integer> ansSet = new HashSet<>();
-        
-        for (int i = 1; i < (1 << n); i++){
-            
-            // minimality는 ansSet에 포함 여부로 확인
-            // & 했을 때 자기값이 그대로 나오는 경우
-            boolean minimal = true;
-            for (int s : ansSet){
-                if((s & i) == s) minimal = false;
-            }
-            
-            if (!minimal) continue;
-            
-            // [여기선 minimality는 통과]
-            if(!isUnique(i, relation)) continue; // uniqueness 통과 못하면 넘기기
-            
-            // [여기까지 오면 다 통과]
-            ansSet.add(i);            
+        // 1. 칼럼 조함 PowerSet
+        for (int i = 0; i < (1 << M); i++){
+            uniqueness(i);
         }
-           
         
-        return ansSet.size();
+        return uniqueAndMin();
     }
     
-    public boolean isUnique(int i, String[][] relation){
+    public void uniqueness(int x) {
         
-        Set<String> set = new HashSet<>();
-        // row 는 고정
-        for (int r = 0; r < m; r++){
-            StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < N; i++){
+            StringBuilder base = new StringBuilder();
             
-            for (int c = 0; c < n; c++){
-                
-                int binInt = (1 << (n-1)) >> c;
-                if((binInt & i) == 0) continue; // 0이면 해당 칼럼은 비포함
-                
-                sb.append(relation[r][c]).append(",");
+            for (int c = 0 ; c < M; c++){
+                // c 칼럼이 들어가는지 확인
+                if ( (x & (1 << c)) != 0) {
+                    base.append("-").append(relation[i][c]);
+                }
             }
-            set.add(sb.toString());
+            
+            for (int j = i+1; j < N; j++){
+                StringBuilder compare = new StringBuilder();
+                
+                for (int c = 0 ; c < M; c++){
+                    // c 칼럼이 들어가는지 확인
+                    if ( (x & (1 << c)) != 0 ) {
+                        compare.append("-").append(relation[j][c]);
+                    }
+                }
+                
+                if (base.toString().equals(compare.toString())) return;
+            }            
         }
         
-        if (set.size() == m) {
-            return true;
-        } else {
-            return false;
-        }
-        
+        unique.add(x); // 통과 한 경우 unique에 넣기
     }
+    
+    public int uniqueAndMin() {
+        int answer = 0;
+        int nn = unique.size();
+        
+        for (int i = 0; i < nn; i++){
+            int base = unique.get(i);
+            boolean minimal = true;
+            
+            for (int j = 0; j < nn; j++){
+                if (j == i) continue;
+                int comp = unique.get(j);
+                
+                int xor = base ^ comp;
+                int check = comp & xor;
+                
+                if (check == 0) minimal = false;
+            }
+            
+            if (minimal) answer++;
+        }
+        
+        return answer;
+    }
+    
 }
