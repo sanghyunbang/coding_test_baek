@@ -1,118 +1,53 @@
 import java.util.*;
 
 class Solution {
-
-    public int[] colors;
-    public int n;
-    public int[][] graph;
-
-    public int[] parents;
-    public Map<Integer, List<Integer>> splitedGraph = new HashMap<>();
-    public Set<Integer> rootKeys;
-
     public boolean isBipartite(int[][] graph) {
-        this.graph = graph;
-        n = graph.length;
-        colors = new int[n];
-
-        getSplitedGraph();
-
-        for (int root : rootKeys) {
-            initWithBfs(root);
-        }
         
-        return check();
-    }
+        /**
+            1. bfs 돌면서 인접 노드들 다른 색깔 주기
+            2. 다음 노드에서 기존에 색깔 있으면 다른지 확인하고, 없으면 나와 다른 색깔 주기
+            2-1. 이전 방문한 애는 무조건 모순 없음.(연결 노드에 다른 색깔 주고, 있으면 확인하기 떄문)
+            2-2. 현재 방문한 경우 확인하면 됨. 방문 안한 애들만 색깔 주기 때문에 이전 방문에 영향 없음 
+         */
 
-    public void initWithBfs(int root) {
-        Queue<Integer> que = new ArrayDeque<>();
-        boolean[] visited = new boolean[n];
+         int n = graph.length;
+         int[] colors = new int[n];
 
-        // init
-        que.offer(root);
-        visited[root] = true;
+         for (int idx = 0 ; idx < n; idx++) {
+            if (colors[idx] != 0) continue; // 이미 방문했으면 지나치기 
+            
+            Queue<Integer> queue = new ArrayDeque<>();
+            queue.offer(idx);
+            colors[idx] = 1;
 
-        while(!que.isEmpty()){
-            // current
-            int curNode = que.poll();
-            int versColor = getVersColor(curNode); // for this, previously color decided
+            while (!queue.isEmpty()) {
 
-            int[] adjs = graph[curNode];
-            for (int adj : adjs) {
+                int curNode = queue.poll(); // 현재 노드 꺼내기
+                int curColor = colors[curNode];
 
-                if (visited[adj]) continue;
+                // 인접 리스트 돌기
+                for (int i : graph[curNode]) {
 
-                visited[adj] = true; // update visit
-                colors[adj] = versColor; // update color
+                    if (colors[i] == 0) {
+                        // 방문을 아예 안한 경우
+                        colors[i] = -curColor;
+                        queue.offer(i);
 
-                que.offer(adj);
-            }
-        }       
-    }
+                        // 이전에 방문을 한 경우 -> queue에 안넣음
+                    } else if (colors[i] != curColor) {
+                        // 이렇게 하면 지금 문제가 아니면 그냥 넘어감
+                        continue;    
 
-    public boolean check() {
-
-        for (int i = 0; i < n; i++){
-            int[] adjs = graph[i];
-            int myColor = colors[i];
-
-            for (int adj : adjs) {
-                if (colors[i] == colors[adj]) {
-                    return false;
+                    } else if (colors[i] == curColor) {
+                        return false;
+                    }
                 }
             }
-        }
+         }
 
-        return true;
+         
+         // 여기까지 오면 통과
+         return true;
     }
 
-    public void getSplitedGraph() {
-        
-        doUnionFind();
-
-        for (int i = 0; i < n; i++){
-            splitedGraph.computeIfAbsent(parents[i], k -> new ArrayList<>()).add(i);
-        }
-
-        rootKeys = splitedGraph.keySet();
-
-    }
-
-    public void doUnionFind() {
-        
-        parents = new int[n];
-        
-        for(int i = 0; i < n; i++){
-            parents[i] = i;
-        }
-
-        for (int i = 0; i < n; i++){
-            int[] adjs = graph[i];
-            for(int adj : adjs) {
-                union(i, adj);
-            }
-        }
-    }
-
-    public void union(int x, int y){
-        int rootX = find(x);
-        int rootY = find(y);
-
-        if(rootX != rootY) {
-            parents[y] = rootX; 
-        }
-    }
-
-    public int find(int x){
-        if (parents[x] == x) return x; // if root -> directly return
-        return parents[x] = find(parents[x]);
-    }
-
-    public int getVersColor(int base){
-        if (colors[base]==0){
-            return 1;
-        } else {
-            return 0;
-        }
-    }
 }
