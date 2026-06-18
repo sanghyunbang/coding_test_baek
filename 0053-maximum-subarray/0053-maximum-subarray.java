@@ -22,10 +22,7 @@ class Solution {
 
         for (int i = 1; i <= n; i++){
             dp[i] = Math.max(dp[i], dp[i] + dp[i-1]);
-        }
-
-        for (int m : dp){
-            maxAns = Math.max(maxAns, m);
+            maxAns = Math.max(maxAns, dp[i]);
         }
 
         return maxAns;
