@@ -2,123 +2,168 @@ import java.util.*;
 
 class Solution {
     private static final int INF = 1 << 28;
-    private int n,m;
-    private String[] g;
-    
+    String[] g;
+    int n, m;
     public int solution(int h, String[] grid, int[][] panels, int[][] seqs) {
+        
         g = grid;
         n = grid.length;
         m = grid[0].length();
         int k = panels.length;
         
-        // 1. 엘리베이터 위치 (모든 층의 구조가 같음)
-        int er = 0, ec = 0;
+        // 0-1. 엘리베이터 위치 찾기 (0-index)
+        int er = -1;
+        int ec = -1;
         for (int i = 0; i < n; i++){
             for (int j = 0; j < m; j++){
-                if(grid[i].charAt(j) == '@'){
+                if(grid[i].charAt(j) == '@') {
                     er = i;
                     ec = j;
                 }
             }
         }
         
-        // 2. 패널 좌표 파싱하기 (행/열만 0-index로)
-        int[] pf = new int[k]; int[] pr = new int[k]; int[] pc = new int[k];
+        // 0-2. panel 위치 f, r, c 로 따로 구분해서 넣어놓기
+        int[] pf = new int[k]; 
+        int[] pr = new int[k];
+        int[] pc = new int[k];
+        
         for (int i = 0; i < k; i++){
             pf[i] = panels[i][0];
-            pr[i] = panels[i][1] - 1;
+            // 이것들은 dist에서 인덱스로 쓰이니까 0-index로
+            pr[i] = panels[i][1] - 1; 
             pc[i] = panels[i][2] - 1;
         }
         
-        // 3. BFS X (k + 1): 각 패널 위치 + 엘리베이터에서 전체 칸 거리
+        // 1. from : 각각의 패널과, 엘리베이터에서 모든 통로 까지 거리
         int[][][] from = new int[k+1][][];
         for (int i = 0; i < k; i++){
             from[i] = bfs(pr[i], pc[i]);
         }
-        from[k] = bfs(er, ec); // 이건 엘리베이터에 각 패널로
+        from[k] = bfs(er, ec);
         
-        // 4. 패널 간 거리 행렬
-        // dist도 0-index
+        // 2. dist : 각각 패널에서 -> 다른 패널로 거리 (엘리베이터 까지 이제는 고려)
         int[][] dist = new int[k][k];
+        
         for (int i = 0; i < k; i++){
             for (int j = 0; j < k; j++){
-                if (pf[i]==pf[j]) {
+                if (pf[i] == pf[j]) {
                     dist[i][j] = from[i][pr[j]][pc[j]];
                 } else {
                     int a = from[i][er][ec];
-                    int b = from[k][pr[j]][pc[j]];
-                    dist[i][j] = a + Math.abs(pf[i] - pf[j]) + b; // 층 이동 포함
+                    int b = Math.abs(pf[i] - pf[j]) + from[k][pr[j]][pc[j]];
+                    dist[i][j] = a + b;
                 }
             }
         }
         
-        // 5. 선행 조건 비트마스크 : pre[j] = j 이전에 커져 있어야 할 집합
+        // 3. pre[i] : i를 실행하기 위한 선행 조건
         int[] pre = new int[k];
-        for (int[] s : seqs){
-            pre[s[1] - 1] = pre[s[1] - 1] | (1 << (s[0] - 1)); // 기존 pre[index] 에 (s[0]-1) 번째 추가로 켜는 과정
+        for (int[] seq : seqs){
+            int latter = seq[1] -1; // 0 - index
+            int former = seq[0] -1;
+            
+            pre[latter] |= (1 << former);
         }
         
-        // 6. 비트마스크 DP
-        int full = 1 << k; 
-        // dp[현재까지 켜진 패널][마지막에 켜진 패널] : [][]상태에서 최소거리
-        int[][] dp = new int[full][k];
-        for (int[] row : dp) {
-            Arrays.fill(row, INF);
+        // 4. dp 돌리기 : 순서에 따른 경우의 수 분기를 없앨 수 있음
+        // dp[현재까지 켜진 패널 상태][마지막으로 켠 패널]
+        int[][] dp = new int[1 << k][k];
+        
+        // dp기본은 INF로 (dp에서 정의 불가능한 부분 막아놓기도 됨)
+        for (int[] d : dp){
+            Arrays.fill(d, INF);
         }
         
-        // 6-1(시작) : 1번 패널(인덱스 0)의 '위치'에서 출발 - 자동 활성화 아님
-        // 선행 패널이 없는 경우에 (시작 위치 : 0) 에서 j까지는 dist[0][j]랑 같음
-        for (int j = 0; j < k; j++){
-            if (pre[j] == 0 && dist[0][j] < INF){
-                dp[1 << j][j] = dist[0][j];
+        // CASE 1) 초기 pre에 없는 경우
+        for (int i = 0; i < k; i++){
+            if (pre[i] == 0) {
+                // [i만 켜진 상태][i로] 가는 최소 거리 = dist[1<<i][i];
+                dp[1 << i][i] = dist[0][i];  
             }
         }
         
-        for (int mask = 1; mask < full; mask++){
+        // CASE 2) pre가 있는 경우
+        // dp[][i를 마지막으로 킴] -> dp[j추가로 킨 상태][j를 마지막으로 킴] 업데이트
+        for (int mask = 0; mask < (1 << k); mask++){
             for (int i = 0; i < k; i++){
-                if ((mask & (1 << i)) == 0) continue; // i가 mask에 있어야
-                int cur = dp[mask][i];
-                if (cur >= INF) continue; // 지금으론 도달 불가능 상태 -> 스킵
-                for (int j = 0; j < k; j++){
-                    if ((mask & (1 << j)) != 0) continue; // 이미 활성화
-                    if ((pre[j] & mask) != pre[j]) continue; // pre가 mask의 부분집합이 아님 -> 충족 못한상태
-                    int nd = cur + dist[i][j];
-                    if (nd < dp[mask | (1 << j)][j]) {
-                        dp[mask | (1 << j)][j] = nd;
+                
+                // mask에 i가 없으면 정의상 불가능 
+                if ( (mask & (1 << i)) != (1 << i)) continue;
+
+                // i가 켜질 수 있는 선행 조건이 만족된 상태인지
+                if ( (pre[i] & mask) != pre[i]) continue;
+                
+                
+                for(int j = 0; j < k; j++){                
+                    // 1. j가 현재 상태에 이미 켜져 있다면 중복이므로 패스
+                    if ((mask & (1 << j)) != 0) continue;
+                    // 2.j가 켜질 수 있는 선행 조건이 만족된 상태인지
+                    if ( (pre[j] & mask) != pre[j]) continue;
+                    
+                    int nState = mask | (1 << j);
+                    int nDist = dp[mask][i] + dist[i][j];
+                    
+                    // i를 타고 가는게 더 짧으면 업데이트
+                    if ( nDist < dp[nState][j]) {
+                        dp[nState][j] = nDist;
                     }
                 }
             }
         }
         
-        int ans = INF;
+        int answer = INF;
+        
         for (int i = 0; i < k; i++){
-            ans = Math.min(ans, dp[full - 1][i]);
+            answer = Math.min(answer, dp[(1 << k) - 1][i]);
         }
-        return ans;
+        
+        return answer;
     }
     
-    // 여기 bfs
-    // (sr, sc)에서 모든 칸까지의 평면 최단거리.
-    private int[][] bfs(int sr, int sc) {
+    public int[][] bfs(int sr, int sc){
+        
         int[][] d = new int[n][m];
-        for (int[] row : d) Arrays.fill(row, INF);
-        ArrayDeque<int[]> q = new ArrayDeque<>();
-        d[sr][sc] = 0;
-        q.add(new int[]{sr, sc});
-        int[] dr = {-1,1,0,0}; int[] dc = {0,0,-1,1};
-        
-        while(!q.isEmpty()){
-            int[] c = q.poll();
-            for (int t = 0; t < 4; t++){
-                int nr = c[0] + dr[t]; int nc = c[1] + dc[t];
-                if (nr < 0 || nr >= n || nc < 0 || nc >= m) continue;
-                if (g[nr].charAt(nc)== '#') continue;
-                if (d[nr][nc] != INF) continue; // 큐에 넣을 때 방문 확정
-                d[nr][nc] = d[c[0]][c[1]] + 1;
-                q.add(new int[]{nr, nc});
-            }
+        for (int[] row : d) {
+            Arrays.fill(row, INF);    
         }
+            
+        d[sr][sc] = 0; // 자기 자신 거리는 0
         
+        ArrayDeque<int[]> q = new ArrayDeque<>();
+        boolean[][] visited = new boolean[n][m];        
+        
+        q.offer(new int[]{sr, sc});
+        visited[sr][sc] = true;
+        
+        int[] dr = {-1, 1, 0, 0};
+        int[] dc = {0, 0, -1, 1};
+            
+        while(!q.isEmpty()){
+            int[] cur = q.poll();
+            
+            int cr = cur[0];
+            int cc = cur[1];
+            
+            for (int i = 0; i < 4; i++){
+                int nr = cr + dr[i];
+                int nc = cc + dc[i];
+                
+                // 범위내 및 안막혀야 함
+                if (nr < 0 || nr >= n || nc < 0 || nc >= m || g[nr].charAt(nc) == '#') {
+                    continue;
+                }
+                // 방문 안함
+                if (visited[nr][nc] == true) {
+                    continue;
+                }
+                visited[nr][nc] = true;
+                q.offer(new int[]{nr, nc});
+                d[nr][nc] = d[cr][cc] + 1;                
+            }
+            
+        }
+         
         return d;
     }
 }
