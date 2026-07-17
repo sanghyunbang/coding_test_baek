@@ -1,6 +1,6 @@
 class Solution {
     public int networkDelayTime(int[][] times, int n, int k) {
-        final int INF = 1 << 28;
+        final int INF = 1 << 10;
         // 0-indexed 평탄 행렬: (n+1)² 대신 n² — 죽은 0행/0열 제거
         int[] g = new int[n * n];
         java.util.Arrays.fill(g, INF);
