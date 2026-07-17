@@ -1,85 +1,46 @@
 class Solution {
-    // 0x3f3f3f3f는 덧셈 오버플로우가 나지 않으면서 충분히 큰 무한대 값입니다.
-    private static final int INF = 0x3f3f3f3f; 
-
     public int networkDelayTime(int[][] times, int n, int k) {
-        int m = times.length;
+        final int INF = 1 << 28;
+        final int S = n + 1;
 
-        // 1. Static Linked List (포인터 배열을 통한 그래프 표현)
-        // 간선 정보를 완전히 평탄화하여 1차원 배열로 관리합니다.
-        int[] head = new int[n + 1];
-        int[] next = new int[m];
-        int[] to = new int[m];
-        int[] weight = new int[m];
-        
-        // head 배열을 -1로 고속 초기화
-        for (int i = 0; i <= n; i++) {
-            head[i] = -1;
-        }
-        
-        // 간선 연결 정보를 인덱스 포인터 체인으로 기록
-        for (int i = 0; i < m; i++) {
-            int u = times[i][0];
-            to[i] = times[i][1];
-            weight[i] = times[i][2];
-            next[i] = head[u];
-            head[u] = i;
+        // 1. 평탄 인접 행렬. 최대 10,201칸(40KB) — 밀집 그래프엔 이게 정답.
+        int[] g = new int[S * S];
+        java.util.Arrays.fill(g, INF);           // SIMD 인트린식으로 벡터화됨
+        for (int[] t : times) {                  // 행 포인터 역참조 1회로 3개 필드 읽기
+            int p = t[0] * S + t[1];
+            if (t[2] < g[p]) g[p] = t[2];        // 중복 간선은 최솟값만
         }
 
-        // 2. 최단 거리 배열 초기화
-        int[] dists = new int[n + 1];
-        for (int i = 0; i <= n; i++) {
-            dists[i] = INF;
-        }
-        dists[k] = 0;
+        int[] dist = new int[S];
+        java.util.Arrays.fill(dist, INF);
+        dist[k] = 0;
 
-        // 3. 커스텀 고속 원형 큐 (Ring Buffer Queue) 구현
-        // 자바 라이브러리 큐를 쓰지 않고, 배열과 비트 연산(&)으로만 동작하는 고속 큐입니다.
-        // n의 최댓값이 크지 않으므로 크기는 충분히 넉넉한 2의 거듭제곱(256)으로 선언합니다.
-        int[] q = new int[256]; 
-        int qMask = 255; // % 연산 대신 비트 연산(&)으로 링 버퍼 인덱스를 순환시켜 속도를 극대화합니다.
-        int headPtr = 0;
-        int tailPtr = 0;
+        // 2. 미확정 노드 압축 리스트 (boolean visited[] 대신)
+        int[] rest = new int[n];
+        for (int i = 0; i < n; i++) rest[i] = i + 1;
+        int cnt = n;
 
-        // 중복 진입 방지 배열
-        boolean[] inQ = new boolean[n + 1];
+        int best = 0;
+        while (cnt > 0) {
+            // argmin: 확정될수록 리스트가 짧아짐 → 총 n²/2 = 5,000회
+            best = INF;
+            int bi = -1;
+            for (int i = 0; i < cnt; i++) {
+                int d = dist[rest[i]];
+                if (d < best) { best = d; bi = i; }
+            }
+            if (best >= INF) return -1;          // 남은 노드 도달 불가 → 즉시 탈출
 
-        // 시작 노드 진입
-        q[tailPtr] = k;
-        tailPtr = (tailPtr + 1) & qMask;
-        inQ[k] = true;
+            int u = rest[bi];
+            rest[bi] = rest[--cnt];              // swap-remove, O(1)
 
-        // 4. SPFA(Shortest Path Faster Algorithm) 루프
-        while (headPtr != tailPtr) {
-            int cur = q[headPtr];
-            headPtr = (headPtr + 1) & qMask;
-            inQ[cur] = false;
-
-            int d = dists[cur];
-            // 포인터 링크를 타고 이웃 노드를 초고속 스캔
-            for (int e = head[cur]; e != -1; e = next[e]) {
-                int nextId = to[e];
-                int nextDist = d + weight[e];
-
-                if (dists[nextId] > nextDist) {
-                    dists[nextId] = nextDist;
-                    if (!inQ[nextId]) {
-                        q[tailPtr] = nextId;
-                        tailPtr = (tailPtr + 1) & qMask;
-                        inQ[nextId] = true;
-                    }
-                }
+            // relax: g의 한 행을 연속 스캔 → JIT가 vpminsd로 벡터화 가능
+            int base = u * S;
+            for (int v = 1; v <= n; v++) {
+                int nd = best + g[base + v];
+                if (nd < dist[v]) dist[v] = nd;
             }
         }
-
-        // 5. 결과 산출
-        int ans = 0;
-        for (int i = 1; i <= n; i++) {
-            int d = dists[i];
-            if (d == INF) return -1;
-            if (d > ans) ans = d;
-        }
-
-        return ans;
+        return best;   // 오름차순 확정 → 마지막 확정 거리가 곧 최댓값
     }
 }
