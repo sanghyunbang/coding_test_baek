@@ -1,72 +1,62 @@
 import java.util.*;
 
 class Solution {
-    public final int MAX = 1_000_000;
-    public int networkDelayTime(int[][] times, int n, int k) {
-        
-        // 1. 일단 인접 리스트로 만들기
-        List<List<int[]>> list = new ArrayList<>();
 
+    private static final int INF = 1 << 8;
+    public int networkDelayTime(int[][] times, int n, int k) {
+
+        // 1. 인접 리스트 만들기
+        List<List<int[]>> list = new ArrayList<>();
         for (int i = 0; i < n + 1; i++){
             list.add(new ArrayList<>());
         }
 
-        int l = times.length;
+        for (int i = 0; i < times.length; i++){
+            int u = times[i][0];
+            int v = times[i][1];
+            int w = times[i][2];
 
-        for (int i = 0; i < l; i++){
-            int[] ele = times[i];
-            int s = ele[0];
-            int t = ele[1];
-            int w = ele[2];
-            list.get(s).add(new int[]{t, w});
+            list.get(u).add(new int[]{v, w});
         }
 
-        // 2. 최단 거리 배열 초기화
+        // 2. PQ 돌리기
+        // dists[target] = target까지 누적 최단거리
         int[] dists = new int[n+1];
-        Arrays.fill(dists, MAX);
-        dists[0] = 0; // 0번째는 안쓰는 인덱스
+        Arrays.fill(dists,INF);
+        dists[0] = 0; // 0은 없는 곳이라 0으로
         dists[k] = 0;
 
-        // int[] : [인덱스, 누적거리]
-        PriorityQueue<int[]> pq = new PriorityQueue<>((o1, o2) -> Integer.compare(o1[1], o2[1]));
+        // int[] 에는 [target, target까지 누적거리]
+        PriorityQueue<int[]> pq = new PriorityQueue<>(
+            (o1, o2) -> Integer.compare(o1[1], o2[1])
+        );
 
-        pq.offer(new int[]{k,0});
+        pq.offer(new int[]{k, 0});
 
         while(!pq.isEmpty()){
-            int[] curr = pq.poll();
-            int curId = curr[0];
-            int curDist = curr[1];
+            int[] cur = pq.poll();
+            int curId = cur[0];
+            int curDist = cur[1];
 
-            // 방문 여부 확인하기 (Lazy ?)
-            if(curDist > dists[curId]) continue;
+            // 이미 더 우선순위 높은 게 된거라 그대로 넘김
+            if (dists[curId] < curDist) continue;
 
-            for (int[] adj : list.get(curId)) {
-
+            for(int[] adj : list.get(curId)){
                 int nextId = adj[0];
-                int nextDist = curDist + adj[1];
+                int nextDist = adj[1] + curDist;
 
-                // dist비교 : curID노드 거쳐서 가는게 빠르면 그 거리로 업데이트
-                if(nextDist < dists[nextId]) {
-                    dists[nextId] = nextDist;
-                    pq.offer(new int[]{nextId, nextDist});
-                } 
+                if (nextDist >= dists[nextId]) continue;
+                dists[nextId] = nextDist;
+                pq.offer(new int[]{nextId, nextDist});
             }
         }
 
-        // 이제 dists 배열 훑으면서 최댓값 찾기
-        PriorityQueue<Integer> findMax = new PriorityQueue<>((o1, o2) -> Integer.compare(o2, o1));
-        
-        for(int i : dists){
-            findMax.offer(i);
+        int ans = 0;
+        for (int v : dists) {
+            ans = Math.max(v, ans);
         }
 
-        int answer = findMax.poll();
-
-        if (answer < MAX) {
-            return answer;
-        } else {
-            return -1;
-        }
+        return (ans == INF) ? -1 : ans;        
 
     }
 }
