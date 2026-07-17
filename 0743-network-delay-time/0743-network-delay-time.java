@@ -1,62 +1,67 @@
 import java.util.*;
 
 class Solution {
+    // 1 << 8 (256)은 여전히 너무 작을 수 있으므로 안전한 INF 값을 사용합니다.
+    private static final int INF = 0x3f3f3f3f; 
 
-    private static final int INF = 1 << 8;
     public int networkDelayTime(int[][] times, int n, int k) {
-
-        // 1. 인접 리스트 만들기
-        List<List<int[]>> list = new ArrayList<>();
-        for (int i = 0; i < n + 1; i++){
-            list.add(new ArrayList<>());
-        }
-
-        for (int i = 0; i < times.length; i++){
+        // 객체 생성을 최소화하기 위해 배열로 간선(Edge)을 관리합니다. (Static Link List)
+        int[] head = new int[n + 1];
+        int[] next = new int[times.length + 1];
+        int[] to = new int[times.length + 1];
+        int[] weight = new int[times.length + 1];
+        
+        Arrays.fill(head, -1);
+        
+        // 간선 연결 정보를 배열에 기록 (ArrayList 대비 메모리/속도 극대화)
+        for (int i = 0; i < times.length; i++) {
             int u = times[i][0];
             int v = times[i][1];
             int w = times[i][2];
-
-            list.get(u).add(new int[]{v, w});
+            
+            to[i] = v;
+            weight[i] = w;
+            next[i] = head[u];
+            head[u] = i;
         }
 
-        // 2. PQ 돌리기
-        // dists[target] = target까지 누적 최단거리
-        int[] dists = new int[n+1];
-        Arrays.fill(dists,INF);
-        dists[0] = 0; // 0은 없는 곳이라 0으로
+        int[] dists = new int[n + 1];
+        Arrays.fill(dists, INF);
         dists[k] = 0;
 
-        // int[] 에는 [target, target까지 누적거리]
-        PriorityQueue<int[]> pq = new PriorityQueue<>(
-            (o1, o2) -> Integer.compare(o1[1], o2[1])
-        );
+        // 큐에 들어있는지 여부를 체크하여 중복 삽입 방지
+        boolean[] inQueue = new boolean[n + 1];
+        
+        // PriorityQueue 대신 ArrayDeque를 사용하여 정렬 비용 제거
+        Queue<Integer> q = new ArrayDeque<>();
+        q.offer(k);
+        inQueue[k] = true;
 
-        pq.offer(new int[]{k, 0});
+        while (!q.isEmpty()) {
+            int cur = q.poll();
+            inQueue[cur] = false;
 
-        while(!pq.isEmpty()){
-            int[] cur = pq.poll();
-            int curId = cur[0];
-            int curDist = cur[1];
+            // head 배열을 이용해 인접 노드 탐색
+            for (int e = head[cur]; e != -1; e = next[e]) {
+                int nextId = to[e];
+                int nextDist = dists[cur] + weight[e];
 
-            // 이미 더 우선순위 높은 게 된거라 그대로 넘김
-            if (dists[curId] < curDist) continue;
-
-            for(int[] adj : list.get(curId)){
-                int nextId = adj[0];
-                int nextDist = adj[1] + curDist;
-
-                if (nextDist >= dists[nextId]) continue;
-                dists[nextId] = nextDist;
-                pq.offer(new int[]{nextId, nextDist});
+                if (dists[nextId] > nextDist) {
+                    dists[nextId] = nextDist;
+                    if (!inQueue[nextId]) {
+                        q.offer(nextId);
+                        inQueue[nextId] = true;
+                    }
+                }
             }
         }
 
         int ans = 0;
-        for (int v : dists) {
-            ans = Math.max(v, ans);
+        for (int i = 1; i <= n; i++) {
+            if (dists[i] == INF) return -1;
+            ans = Math.max(ans, dists[i]);
         }
 
-        return (ans == INF) ? -1 : ans;        
-
+        return ans;
     }
 }
